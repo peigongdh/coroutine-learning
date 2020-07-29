@@ -1,0 +1,7 @@
+project(super_lightweight_stackless_coroutine_framework)
+
+set(SRC_LIST super_lightweight_stackless_coroutine_framework.cpp)
+message(STATUS ${SRC_LIST})
+message(STATUS "This is Binary dir" ${PROJECT_BINARY_DIR})
+message(STATUS "This is Source dir" ${PROJECT_SOURCE_DIR})
+add_executable(super_lightweight_stackless_coroutine_framework ${SRC_LIST})
