@@ -1,27 +1,24 @@
-var q = nil
+var i = 0
 
-async function producer(d) {
-    d = d + 1
-    console.log("produce:" + d)
-    await consumer(d)
+async function producer() {
+    while (true) {
+        if (i >= 5) {
+            break
+        }
+        i ++
+        console.log("produce:" + i)
+        await consumer()
+    }
 }
 
-async function consumer(d) {
-    console.log("consume:"+d)
-    await producer(d)
+async function consumer() {
+    while (true) {
+        if (i >= 5) {
+            break
+        }
+        console.log("consume:" + i)
+        await producer()
+    }
 }
 
-producer(0).catch(error => console.log(error.stack));
-
-// function producer(d) {
-//     d = d + 1
-//     console.log("produce:" + d)
-//     consumer(d)
-// }
-
-// function consumer(d) {
-//     console.log("consume:"+d)
-//     producer(d)
-// }
-
-// producer(0);
+producer().catch(error => console.log(error.stack));
