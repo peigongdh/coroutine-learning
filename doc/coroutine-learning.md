@@ -1,12 +1,109 @@
-## 定义
+## 概念
+
+### 定义
 
 > Coroutines are computer program components that generalize subroutines for non-preemptive multitasking, by allowing execution to be suspended and resumed. 
 
 > 译：协程是计算机程序组件，通过允许挂起和恢复执行来概括非抢先式多任务处理的子例程。
 
-## 生产者消费者
+参考：
+> https://en.wikipedia.org/wiki/Coroutine
 
-### yield&resume
+- 协程的本地数据在后续调用中始终保持
+- 协程在控制离开时暂停执行，当控制再次进入时只能从离开的位置继续执行
+
+### 分类
+
+#### 对称协程与非对称协程
+
+- 对称协程 Symmetric Coroutine：任何一个协程都是相互独立且平等的，调度权可以在任意协程之间转移。
+- 非对称协程 Asymmetric Coroutine：协程出让调度权的目标只能是它的调用者，即协程之间存在调用和被调用关系。
+
+- 对称协程实际上已经非常接近线程的样子了，例如 Go 语言中的 go routine 可以通过读写不同的 channel 来实现控制权的自由转移。而非对称协程的调用关系实际上也更符合我们的思维方式，常见的语言对协程的实现大多是非对称实现，例如 Lua 的协程中当前协程调用 yield 总是会将调度权转移给 resume 它的协程；还有就是我们在前面提到的 async/await，await 时将调度权转移到异步调用中，异步调用返回结果或抛出异常时总是将调度权转移回 await 的位置。
+
+- 从实现的角度来讲，非对称协程的实现更自然，也相对容易；不过，我们只要对非对称协程稍作修改，即可实现对称协程的能力。在非对称协程的基础上，我们只需要添加一个中立的第三方作为协程调度权的分发中心，所有的协程在挂起时都将控制权转移给分发中心，分发中心根据参数来决定将调度权转移给哪个协程，例如 Lua 的第三方库 coro，以及 Kotlin 协程框架中基于 Channel 的通信等。
+
+参考：
+> https://www.bennyhuo.com/2019/12/01/coroutine-implementations/
+
+#### 有栈协程与无栈协程
+
+- 有栈协程 Stackful Coroutine：每一个协程都会有自己的调用栈，有点儿类似于线程的调用栈，这种情况下的协程实现其实很大程度上接近线程，主要不同体现在调度上。
+- 无栈协程 Stackless Coroutine：协程没有自己的调用栈，挂起点的状态通过状态机或者闭包等语法来实现。
+
+参考：
+> https://www.bennyhuo.com/2019/12/01/coroutine-implementations/
+
+### 对比
+
+协程 vs 函数
+- 传统的程序都是依赖多个子程序（函数）的层次调用来完成的，如A调用B、B调用C，C执行完毕返回，B执行完毕返回，最后是A执行完毕返回；这些函数都是通过栈实现的，函数调用总是一个入口，一个栈空间，一次返回，调用顺序是明确的。
+- 协程的调用与函数不同，协程看上去也是函数，但是在执行过程中，可以显式中断，转而去执行其他函数，在适当的时候再返回来执行；这有点像操作系统的线程，执行过程中可能被挂起，让位于别的线程执行，稍后又从挂起的地方恢复执行。
+- 这个过程中，协程与协程之间实际上不是普通“调用者与被调者”的关系，他们之间的关系是对称的。
+
+协程 vs 生成器
+- 生成器（Generator）也是函数的一种泛化，但是比协程有局限性。
+- 具体的说，两者都可以调用(yield)多次，暂停执行并回到入口初执行。但是他们在控制执行后的处理是不同的，生成器只能将控- 制权交还给调用生成器的地方，也就是说，生成器主要用于简化迭代器的编写，因此其中的yield不能跳转到特定的函数，只能将值传回到调用者函数中。
+
+协程 vs 递归
+- 使用协程有点像使用递归，数据控制都切换到了不同的函数中。
+- 协程会更灵活高效，因为协程是yield而不是return，是resume执行而不是从头开始，因此更容易保存状态。
+- 递归函数则需要使用共享变量或传输状态参数。此外，递归调用需要新的堆栈而协程则可以复用现有的上下文。
+
+协程 vs 回调
+- 都实现异步通信，但是协程代码可读性、可维护性更好。
+
+参考：
+> http://blackfox1983.github.io/posts/2018/05/06/intro-of-coroutine-1/
+
+## 例子
+
+### demo
+
+```lua
+function foo(n)
+    local i = 0
+    while i < 5 do
+        local id, status = coroutine.running()
+        print(id, n + i)
+        coroutine.yield()
+        i = i + 1
+    end
+end
+
+function test()
+    local co1 = coroutine.create(foo)
+    local co2 = coroutine.create(foo)
+    print("main start")
+    coroutine.resume(co1, 0)
+    coroutine.resume(co2, 100)
+    while coroutine.status(co1) ~= "dead" and coroutine.status(co2) ~= "dead" do
+        coroutine.resume(co1)
+        coroutine.resume(co2)
+    end
+    print("main end")
+end
+
+test()
+```
+
+结果
+```
+main start
+thread: 0x7fffc100baf8  0
+thread: 0x7fffc100be68  100
+thread: 0x7fffc100baf8  1
+thread: 0x7fffc100be68  101
+thread: 0x7fffc100baf8  2
+thread: 0x7fffc100be68  102
+thread: 0x7fffc100baf8  3
+thread: 0x7fffc100be68  103
+thread: 0x7fffc100baf8  4
+thread: 0x7fffc100be68  104
+main end
+```
+
+### 生产者消费者
 
 ```lua
 local newProducer
@@ -60,27 +157,96 @@ produce:5
 consume:5
 ```
 
-### 协程状态机
-
-![](v2-292c3d7220e6667d1db9c033c1d703c2_1440w.png)
-
-### async&await
-
-TODO
-
-## 协程的分类
-
-### 有栈协程与无栈协程
-
-> https://mthli.xyz/stackful-stackless/
-
 ## 实现
 
+### 无栈协程
+
+```c++
+#define BEGIN_CORO void operator()() { switch(next_line) { case 0:
+#define YIELD next_line=__LINE__; break; case __LINE__:
+#define END_CORO }} int next_line=0
+```
+
+```c++
+#include <iostream>
+#include "super_super_super_super_lightweight_stackless_coroutine_framework.h"
+
+struct SomeCoroutine {
+	int n_; // Add whatever you want
+	SomeCoroutine(int n) : n_(n) {}
+	
+	BEGIN_CORO;
+	std::cout << "coroutine" << n_ << " hello 1" << std::endl;
+	YIELD;
+	std::cout << "coroutine" << n_ << " hello 2" << std::endl;
+	YIELD;
+	std::cout << "coroutine" << n_ << " hello 3" << std::endl;
+	END_CORO;
+};
+
+int main() {
+	SomeCoroutine co1(1);
+	SomeCoroutine co2(2);
+	co1();
+	co2();
+	co1();
+	co2();
+	co1();
+	co2();
+}
+```
+打印
+
+```
+coroutine1 hello 1
+coroutine2 hello 1
+coroutine1 hello 2
+coroutine2 hello 2
+coroutine1 hello 3
+coroutine2 hello 3
+```
+
+参考：
+> https://zhuanlan.zhihu.com/p/32312942
+
+Duff's device：
+> https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
+
+### 有栈协程
+
+一个基于共享栈的非对称协程实践
 > https://github.com/peigongdh/coroutinedh
 
-基于共享栈的非对称协程实践
+关键代码
 
-### 关键代码阅读
+```c
+struct schedule {
+    char stack[STACK_SIZE];    // 运行时栈，此栈即是共享栈
+
+    ucontext_t main; // 主协程的上下文，当创建的协程调用coroutine_yield切出控制权，实际上会切到主协程运行
+    int nco;        // 当前存活的协程个数
+    int cap;        // 协程管理器的当前最大容量
+    int running;    // 正在运行的协程 ID
+    struct coroutine **co; // 一个一维数组，用于存放所有协程。其长度等于 cap
+};
+```
+
+![](Jietu20181215-192541.jpg)
+
+```c
+struct coroutine {
+    coroutine_func func; // 协程所用的函数
+    void *ud;  // 协程参数
+    ctx_context_t ctx; // 协程上下文
+    struct schedule *sch; // 该协程所属的调度器
+    ptrdiff_t cap;     // 已经分配的内存大小
+    ptrdiff_t size; // 当前协程运行时栈，保存起来后的大小
+    int status;    // 协程当前的状态
+    char *stack; // 当前协程的保存起来的运行时栈
+};
+```
+
+![](Jietu20181215-204455.jpg)
 
 ```c
 void
@@ -132,6 +298,17 @@ coroutine_yield(struct schedule *S) {
     // ...
 ```
 
+协程状态机
+![](v2-292c3d7220e6667d1db9c033c1d703c2_1440w.png)
+
+参考：
+> https://github.com/cloudwu/coroutine/
+
+图片和解析参考：
+> https://www.cyhone.com/articles/analysis-of-cloudwu-coroutine/
+
+> http://www.xiaocc.xyz/2018-12-14/%E5%8D%8F%E7%A8%8B%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%903/
+
 ### ucontext库
 
 > https://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html
@@ -158,11 +335,10 @@ void makecontext(ucontext_t *, (void *)(), int, ...);
 int  swapcontext(ucontext_t *, const ucontext_t *);
 ```
 
-> ucontext库解析：https://blog.csdn.net/qq910894904/article/details/41911175
+ucontext库解析：
+> https://blog.csdn.net/qq910894904/article/details/41911175
 
-## 函数调用栈
-
-> 参考：https://mthli.xyz/stackful-stackless/
+### 函数调用栈
 
 ```c
 int callee() { // callee:
@@ -235,8 +411,10 @@ caller:
     ...
 ```
 
-## 自己实现ucontext
+参考：
+> https://mthli.xyz/stackful-stackless/
 
+### 自己实现ucontext
 
 ```c
 // 保存当前上下文到oucp结构体中，然后激活upc上下文。
@@ -315,8 +493,10 @@ ctx_swapcontext: \n"
 ");
 ```
 
-寄存器保存
+参考：
+> https://github.com/skywind3000/collection/tree/master/vintage/context
+
+> https://zhuanlan.zhihu.com/p/32431200
+
+寄存器保存：
 > https://en.wikipedia.org/wiki/X86_calling_conventions#Caller-saved_(volatile)_registers
-
-## 函数调用栈
-

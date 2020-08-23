@@ -1,8 +1,8 @@
 function foo(n)
     local i = 0
     while i < 5 do
-        print(coroutine.running())
-        print(n + i)
+        local id, status = coroutine.running()
+        print(id, n + i)
         coroutine.yield()
         i = i + 1
     end
