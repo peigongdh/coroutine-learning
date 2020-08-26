@@ -302,7 +302,7 @@ coroutine_yield(struct schedule *S) {
 ### ucontext库
 
 ```c
-ucontext_t *uc_link     pointer to the context that will be resumed
+ucontext_t  *uc_link    pointer to the context that will be resumed
                         when this context returns
 sigset_t    uc_sigmask  the set of signals that are blocked when this
                         context is active
@@ -324,6 +324,8 @@ int  swapcontext(ucontext_t *, const ucontext_t *);
 ```
 
 ### 函数调用栈
+
+![](v2-dc05fb9735d16396786f7778d0a5b159_1440w.png)
 
 ```c
 int callee() { // callee:
@@ -485,8 +487,7 @@ ctx_swapcontext: \n"
 - 游戏场景切换
 > https://gameinstitute.qq.com/community/detail/107515
 
-- libco是微信后台大规模使用的c/c++协程库，2013年至今稳定运行在微信后台的数万台机器上。
-- libco通过仅有的几个函数接口 co_create/co_resume/co_yield 再配合 co_poll，可以支持同步或者异步的写法，如线程库一样轻松。同时库里面提供了socket族函数的hook，使得后台逻辑服务几乎不用修改逻辑代码就可以完成异步化改造。
+- libco是微信后台大规模使用的c/c++协程库
 > https://github.com/Tencent/libco
 
 ## 参考文档
