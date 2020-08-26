@@ -23,16 +23,10 @@
 
 - 从实现的角度来讲，非对称协程的实现更自然，也相对容易；不过，我们只要对非对称协程稍作修改，即可实现对称协程的能力。在非对称协程的基础上，我们只需要添加一个中立的第三方作为协程调度权的分发中心，所有的协程在挂起时都将控制权转移给分发中心，分发中心根据参数来决定将调度权转移给哪个协程，例如 Lua 的第三方库 coro，以及 Kotlin 协程框架中基于 Channel 的通信等。
 
-参考：
-> https://www.bennyhuo.com/2019/12/01/coroutine-implementations/
-
 #### 有栈协程与无栈协程
 
 - 有栈协程 Stackful Coroutine：每一个协程都会有自己的调用栈，有点儿类似于线程的调用栈，这种情况下的协程实现其实很大程度上接近线程，主要不同体现在调度上。
 - 无栈协程 Stackless Coroutine：协程没有自己的调用栈，挂起点的状态通过状态机或者闭包等语法来实现。
-
-参考：
-> https://www.bennyhuo.com/2019/12/01/coroutine-implementations/
 
 ### 对比
 
@@ -52,9 +46,6 @@
 
 协程 vs 回调
 - 都实现异步通信，但是协程代码可读性、可维护性更好。
-
-参考：
-> http://blackfox1983.github.io/posts/2018/05/06/intro-of-coroutine-1/
 
 ## 例子
 
@@ -298,20 +289,17 @@ coroutine_yield(struct schedule *S) {
     // ...
 ```
 
-协程状态机
-![](v2-292c3d7220e6667d1db9c033c1d703c2_1440w.png)
+![协程状态机](v2-292c3d7220e6667d1db9c033c1d703c2_1440w.png)
 
 参考：
 > https://github.com/cloudwu/coroutine/
 
-图片和解析参考：
+源码分析参考：
 > https://www.cyhone.com/articles/analysis-of-cloudwu-coroutine/
 
 > http://www.xiaocc.xyz/2018-12-14/%E5%8D%8F%E7%A8%8B%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%903/
 
 ### ucontext库
-
-> https://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html
 
 ```c
 ucontext_t *uc_link     pointer to the context that will be resumed
@@ -334,9 +322,6 @@ int  setcontext(const ucontext_t *);
 void makecontext(ucontext_t *, (void *)(), int, ...);
 int  swapcontext(ucontext_t *, const ucontext_t *);
 ```
-
-ucontext库解析：
-> https://blog.csdn.net/qq910894904/article/details/41911175
 
 ### 函数调用栈
 
@@ -410,9 +395,6 @@ caller:
     movl $0, %eax
     ...
 ```
-
-参考：
-> https://mthli.xyz/stackful-stackless/
 
 ### 自己实现ucontext
 
@@ -498,5 +480,31 @@ ctx_swapcontext: \n"
 
 > https://zhuanlan.zhihu.com/p/32431200
 
-寄存器保存：
+## 应用场景
+
+- 游戏场景切换
+> https://gameinstitute.qq.com/community/detail/107515
+
+- libco是微信后台大规模使用的c/c++协程库，2013年至今稳定运行在微信后台的数万台机器上。
+- libco通过仅有的几个函数接口 co_create/co_resume/co_yield 再配合 co_poll，可以支持同步或者异步的写法，如线程库一样轻松。同时库里面提供了socket族函数的hook，使得后台逻辑服务几乎不用修改逻辑代码就可以完成异步化改造。
+> https://github.com/Tencent/libco
+
+## 参考文档
+
+- 协程的几类常见的实现
+> https://www.bennyhuo.com/2019/12/01/coroutine-implementations/
+
+- 协程-什么是协程
+> http://blackfox1983.github.io/posts/2018/05/06/intro-of-coroutine-1/
+
+- ucontext-人人都可以实现的简单协程库
+> https://blog.csdn.net/qq910894904/article/details/41911175
+
+- 有栈协程与无栈协程
+> https://mthli.xyz/stackful-stackless/
+
+- 寄存器保存
 > https://en.wikipedia.org/wiki/X86_calling_conventions#Caller-saved_(volatile)_registers
+
+- ucontext manual
+> https://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html
